@@ -101,9 +101,9 @@ function fit_physical(x::AbstractMatrix, d::Integer)
     V = volume(ϵ)
     u = rand(ϵ, b)
 
-    # A = cholesky(P).U
+    A = cholesky(P).U
 
-    x0 = [μ..., vcat([P[1:i, i] for i in 1:p]...)...]
+    x0 = [μ..., vcat([A[1:i, i] for i in 1:p]...)...]
 
     function f(x_opt)
         μ_opt = x_opt[1:p]
@@ -115,7 +115,7 @@ function fit_physical(x::AbstractMatrix, d::Integer)
             start += i
         end
 
-        P_opt = P_opt' + P_opt - Diagonal(P_opt)
+        P_opt = P_opt' * P_opt
 
         c = V / b * sum([exp(-_ϕ(δ, μ_opt, P_opt, d)) for δ in eachcol(u)])
 
@@ -124,7 +124,13 @@ function fit_physical(x::AbstractMatrix, d::Integer)
         return lh
     end
 
-    res = maximize(f, x0, LBFGS(); autodiff=:forward)
+    res = maximize(
+        f,
+        x0,
+        LBFGS(),
+        Optim.Options(; x_tol=1e-5, f_tol=1e-5, store_trace=true, show_trace=true);
+        autodiff=:forward,
+    )
 
     @show res
 
