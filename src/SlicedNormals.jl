@@ -103,6 +103,9 @@ function fit_physical(x::AbstractMatrix, d::Integer)
 
     A = cholesky(P).U
 
+    Zu = mapreduce(δ -> Z(δ, d), hcat, eachcol(u))
+    Zx = mapreduce(δ -> Z(δ, d), hcat, eachrow(x))
+
     x0 = [μ..., vcat([A[1:i, i] for i in 1:p]...)...]
 
     function f(x_opt)
@@ -117,9 +120,9 @@ function fit_physical(x::AbstractMatrix, d::Integer)
 
         P_opt = P_opt' * P_opt
 
-        c = V / b * sum([exp(-_ϕ(δ, μ_opt, P_opt, d)) for δ in eachcol(u)])
+        c = V / b * sum(exp.(-_ϕz(Zu, μ_opt, P_opt)))
 
-        lh = -n * log(c) - sum([_ϕ(δ, μ_opt, P_opt, d) for δ in eachrow(x)])
+        lh = -n * log(c) - sum(_ϕz(Zx, μ_opt, P_opt))
 
         return lh
     end
@@ -148,7 +151,9 @@ function fit_physical(x::AbstractMatrix, d::Integer)
 
     P = P' * P
 
-    return SlicedNormal(d, μ, P, Δ, 1), lh
+    c = V / b * sum(exp.(-_ϕz(Zu, μ, P)))
+
+    return SlicedNormal(d, μ, P, Δ, c), lh
 end
 
 function fit_baseline(x::AbstractMatrix, d::Integer, Δ::IntervalBox)
@@ -275,6 +280,14 @@ end
 function _ϕ(δ, μ, P, d)
     z = Z(δ, d)
     return ((z - μ)' * P * (z - μ)) / 2
+end
+
+function _ϕz(z::AbstractVector, μ, P)
+    return ((z - μ)' * P * (z - μ)) / 2
+end
+
+function _ϕz(Z::AbstractMatrix, μ, P)
+    return vec(sum((Z .- μ) .* (P * (Z .- μ)); dims=1)) ./ 2
 end
 
 end # module
